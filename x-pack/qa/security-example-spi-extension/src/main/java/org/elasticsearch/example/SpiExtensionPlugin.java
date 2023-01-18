@@ -40,6 +40,7 @@ public class SpiExtensionPlugin extends Plugin implements ActionPlugin {
         list.add(CustomRealm.USERNAME_SETTING);
         list.add(CustomRealm.PASSWORD_SETTING);
         list.add(CustomRealm.ROLES_SETTING);
+        list.add(CustomRealm.DELEGATED_AUTHENTICATION_REALM_SETTING);
         return list;
     }
 }
