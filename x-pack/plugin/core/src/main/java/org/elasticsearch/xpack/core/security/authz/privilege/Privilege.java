@@ -88,7 +88,7 @@ public class Privilege {
     /**
      * Returns true if this privilege grants all names.
      */
-    public boolean isGrantingAll() {
+    public boolean grantsAll() {
         return grantsAll.get();
     }
 

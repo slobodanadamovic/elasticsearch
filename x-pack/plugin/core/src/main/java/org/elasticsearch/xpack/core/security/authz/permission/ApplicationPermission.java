@@ -197,7 +197,7 @@ public final class ApplicationPermission {
             if (this.application.test(other.getApplication()) == false) {
                 return false;
             }
-            if (privilege.isGrantingAll()) {
+            if (privilege.grantsAll()) {
                 return true;
             }
             return Operations.isEmpty(privilege.getAutomaton()) == false
