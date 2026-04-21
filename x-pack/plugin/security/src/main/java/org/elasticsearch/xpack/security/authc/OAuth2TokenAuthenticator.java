@@ -17,6 +17,8 @@ import org.elasticsearch.xpack.core.security.authc.Authentication;
 import org.elasticsearch.xpack.core.security.authc.AuthenticationResult;
 import org.elasticsearch.xpack.core.security.authc.AuthenticationToken;
 import org.elasticsearch.xpack.core.security.authc.support.BearerToken;
+import org.elasticsearch.xpack.security.metric.AuthcFailureReason;
+import org.elasticsearch.xpack.security.metric.AuthcFailureReasonClassifier;
 import org.elasticsearch.xpack.security.metric.InstrumentedSecurityActionListener;
 import org.elasticsearch.xpack.security.metric.SecurityMetricType;
 import org.elasticsearch.xpack.security.metric.SecurityMetrics;
@@ -26,7 +28,31 @@ import java.util.function.LongSupplier;
 
 class OAuth2TokenAuthenticator implements Authenticator {
 
+    public static final String ATTRIBUTE_TOKEN_AUTHC_FAILURE_REASON = "es_security_token_authc_failure_reason";
+
     private static final Logger logger = LogManager.getLogger(OAuth2TokenAuthenticator.class);
+
+    enum Failure implements AuthcFailureReason {
+        INVALID_TOKEN("client.invalid_token");
+
+        private final String value;
+
+        Failure(String value) {
+            this.value = value;
+        }
+
+        @Override
+        public String value() {
+            return value;
+        }
+    }
+
+    static final AuthcFailureReasonClassifier FAILURE_CLASSIFIER = new AuthcFailureReasonClassifier() {
+        @Override
+        public AuthcFailureReason fromResult(AuthenticationResult<?> result) {
+            return Failure.INVALID_TOKEN;
+        }
+    };
 
     private final SecurityMetrics<BearerToken> authenticationMetrics;
     private final TokenService tokenService;
@@ -40,6 +66,7 @@ class OAuth2TokenAuthenticator implements Authenticator {
             SecurityMetricType.AUTHC_OAUTH2_TOKEN,
             meterRegistry,
             token -> Map.of(),
+            (token, reason) -> Map.of(ATTRIBUTE_TOKEN_AUTHC_FAILURE_REASON, reason.value()),
             nanoTimeSupplier
         );
         this.tokenService = tokenService;
@@ -64,7 +91,11 @@ class OAuth2TokenAuthenticator implements Authenticator {
             return;
         }
         final BearerToken bearerToken = (BearerToken) authenticationToken;
-        doAuthenticate(context, bearerToken, InstrumentedSecurityActionListener.wrapForAuthc(authenticationMetrics, bearerToken, listener));
+        doAuthenticate(
+            context,
+            bearerToken,
+            InstrumentedSecurityActionListener.wrapForAuthc(authenticationMetrics, bearerToken, FAILURE_CLASSIFIER, listener)
+        );
     }
 
     private void doAuthenticate(Context context, BearerToken bearerToken, ActionListener<AuthenticationResult<Authentication>> listener) {

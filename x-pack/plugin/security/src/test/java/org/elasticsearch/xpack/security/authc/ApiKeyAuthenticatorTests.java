@@ -22,7 +22,9 @@ import org.elasticsearch.xpack.core.security.authc.Authentication;
 import org.elasticsearch.xpack.core.security.authc.AuthenticationField;
 import org.elasticsearch.xpack.core.security.authc.AuthenticationResult;
 import org.elasticsearch.xpack.core.security.user.User;
+import org.elasticsearch.xpack.security.authc.ApiKeyAuthenticator.Failure;
 import org.elasticsearch.xpack.security.authc.AuthenticationService.AuditableRequest;
+import org.elasticsearch.xpack.security.metric.AuthcFailureReason;
 import org.elasticsearch.xpack.security.metric.SecurityMetricType;
 
 import java.util.Map;
@@ -158,6 +160,13 @@ public class ApiKeyAuthenticatorTests extends AbstractAuthenticatorTests {
         final PlainActionFuture<AuthenticationResult<Authentication>> future = new PlainActionFuture<>();
         apiKeyAuthenticator.authenticate(context, future);
 
+        final String expectedCategory;
+        if (exception != null) {
+            expectedCategory = AuthcFailureReason.SERVER_INTERNAL_ERROR.value();
+        } else {
+            expectedCategory = Failure.INVALID_CREDENTIALS.value();
+        }
+
         if (failWithTermination) {
             final Exception e = expectThrows(Exception.class, future::actionGet);
             if (exception == null) {
@@ -169,7 +178,10 @@ public class ApiKeyAuthenticatorTests extends AbstractAuthenticatorTests {
             assertSingleFailedAuthMetric(
                 telemetryPlugin,
                 SecurityMetricType.AUTHC_API_KEY,
-                Map.ofEntries(Map.entry(ApiKeyAuthenticator.ATTRIBUTE_API_KEY_TYPE, apiKeyCredentials.getExpectedType().value()))
+                Map.ofEntries(
+                    Map.entry(ApiKeyAuthenticator.ATTRIBUTE_API_KEY_TYPE, apiKeyCredentials.getExpectedType().value()),
+                    Map.entry(ApiKeyAuthenticator.ATTRIBUTE_API_KEY_AUTHC_FAILURE_REASON, expectedCategory)
+                )
             );
         } else {
             var authResult = future.actionGet();
@@ -177,7 +189,10 @@ public class ApiKeyAuthenticatorTests extends AbstractAuthenticatorTests {
             assertSingleFailedAuthMetric(
                 telemetryPlugin,
                 SecurityMetricType.AUTHC_API_KEY,
-                Map.ofEntries(Map.entry(ApiKeyAuthenticator.ATTRIBUTE_API_KEY_TYPE, apiKeyCredentials.getExpectedType().value()))
+                Map.ofEntries(
+                    Map.entry(ApiKeyAuthenticator.ATTRIBUTE_API_KEY_TYPE, apiKeyCredentials.getExpectedType().value()),
+                    Map.entry(ApiKeyAuthenticator.ATTRIBUTE_API_KEY_AUTHC_FAILURE_REASON, expectedCategory)
+                )
             );
         }
 
@@ -220,11 +235,13 @@ public class ApiKeyAuthenticatorTests extends AbstractAuthenticatorTests {
         var e = expectThrows(ElasticsearchSecurityException.class, future::actionGet);
         assertThat(e, sameInstance(exception));
 
-        // expecting single recorded auth failure with message same as the thrown exception
         assertSingleFailedAuthMetric(
             telemetryPlugin,
             SecurityMetricType.AUTHC_API_KEY,
-            Map.ofEntries(Map.entry(ApiKeyAuthenticator.ATTRIBUTE_API_KEY_TYPE, apiKeyCredentials.getExpectedType().value()))
+            Map.ofEntries(
+                Map.entry(ApiKeyAuthenticator.ATTRIBUTE_API_KEY_TYPE, apiKeyCredentials.getExpectedType().value()),
+                Map.entry(ApiKeyAuthenticator.ATTRIBUTE_API_KEY_AUTHC_FAILURE_REASON, AuthcFailureReason.SERVER_INTERNAL_ERROR.value())
+            )
         );
 
         // verify that there were no successes recorded

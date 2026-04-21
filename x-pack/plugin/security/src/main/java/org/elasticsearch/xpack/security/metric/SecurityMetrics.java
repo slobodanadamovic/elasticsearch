@@ -27,6 +27,7 @@ public final class SecurityMetrics<C> {
     private final LongHistogram timeHistogram;
 
     private final SecurityMetricAttributesBuilder<C> attributesBuilder;
+    private final SecurityMetricFailureAttributesBuilder<C> failureAttributesBuilder;
     private final LongSupplier nanoTimeSupplier;
     private final SecurityMetricType metricType;
 
@@ -36,11 +37,22 @@ public final class SecurityMetrics<C> {
         final SecurityMetricAttributesBuilder<C> attributesBuilder,
         final LongSupplier nanoTimeSupplier
     ) {
+        this(metricType, meterRegistry, attributesBuilder, null, nanoTimeSupplier);
+    }
+
+    public SecurityMetrics(
+        final SecurityMetricType metricType,
+        final MeterRegistry meterRegistry,
+        final SecurityMetricAttributesBuilder<C> attributesBuilder,
+        final SecurityMetricFailureAttributesBuilder<C> failureAttributesBuilder,
+        final LongSupplier nanoTimeSupplier
+    ) {
         this.metricType = Objects.requireNonNull(metricType);
         this.successCounter = metricType.successMetricInfo().registerAsLongCounter(meterRegistry);
         this.failuresCounter = metricType.failuresMetricInfo().registerAsLongCounter(meterRegistry);
         this.timeHistogram = metricType.timeMetricInfo().registerAsLongHistogram(meterRegistry);
         this.attributesBuilder = Objects.requireNonNull(attributesBuilder);
+        this.failureAttributesBuilder = failureAttributesBuilder;
         this.nanoTimeSupplier = Objects.requireNonNull(nanoTimeSupplier);
     }
 
@@ -66,12 +78,29 @@ public final class SecurityMetrics<C> {
     }
 
     /**
-     * Records a single failed execution.
+     * Records a single failed execution without fault classification.
      *
-     * @param context       The context object which is used to attach additional attributes to failed metric.
+     * @param context The context object which is used to attach additional attributes to failed metric.
      */
     public void recordFailure(final C context) {
         this.failuresCounter.incrementBy(1L, attributesBuilder.build(context));
+    }
+
+    /**
+     * Records a single failed execution with fault classification. If a {@link SecurityMetricFailureAttributesBuilder}
+     * was provided at construction time, it is used to build the full attribute map (including the fault) in one step.
+     * Otherwise, falls back to the base attributes builder (fault is not recorded as an attribute).
+     *
+     * @param context The context object which is used to attach additional attributes to failed metric.
+     * @param reason  The failure reason for this failure.
+     */
+    public void recordFailure(final C context, final AuthcFailureReason reason) {
+        Objects.requireNonNull(reason);
+        if (failureAttributesBuilder != null) {
+            this.failuresCounter.incrementBy(1L, failureAttributesBuilder.build(context, reason));
+        } else {
+            this.failuresCounter.incrementBy(1L, attributesBuilder.build(context));
+        }
     }
 
     /**

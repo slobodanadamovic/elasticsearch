@@ -25,6 +25,7 @@ import org.elasticsearch.xpack.core.security.authc.AuthenticationToken;
 import org.elasticsearch.xpack.core.security.authc.Realm;
 import org.elasticsearch.xpack.core.security.authc.RealmDomain;
 import org.elasticsearch.xpack.core.security.user.User;
+import org.elasticsearch.xpack.security.metric.AuthcFailureReason;
 import org.elasticsearch.xpack.security.metric.SecurityMetricType;
 import org.junit.Before;
 
@@ -345,7 +346,8 @@ public class RealmsAuthenticatorTests extends AbstractAuthenticatorTests {
             SecurityMetricType.AUTHC_REALMS,
             Map.ofEntries(
                 Map.entry(RealmsAuthenticator.ATTRIBUTE_REALM_NAME, unsuccessfulRealm.name()),
-                Map.entry(RealmsAuthenticator.ATTRIBUTE_REALM_TYPE, unsuccessfulRealm.type())
+                Map.entry(RealmsAuthenticator.ATTRIBUTE_REALM_TYPE, unsuccessfulRealm.type()),
+                Map.entry(RealmsAuthenticator.ATTRIBUTE_REALM_AUTHC_FAILURE_REASON, AuthcFailureReason.CLIENT_AUTHENTICATION_FAILED.value())
             )
         );
 

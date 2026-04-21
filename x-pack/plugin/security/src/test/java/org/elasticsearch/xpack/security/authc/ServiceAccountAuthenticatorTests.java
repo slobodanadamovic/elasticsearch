@@ -20,6 +20,7 @@ import org.elasticsearch.xpack.core.security.authc.service.ServiceAccount.Servic
 import org.elasticsearch.xpack.core.security.authc.service.ServiceAccountToken;
 import org.elasticsearch.xpack.core.security.user.User;
 import org.elasticsearch.xpack.security.authc.service.ServiceAccountService;
+import org.elasticsearch.xpack.security.metric.AuthcFailureReason;
 import org.elasticsearch.xpack.security.metric.SecurityMetricType;
 
 import java.util.Map;
@@ -123,12 +124,16 @@ public class ServiceAccountAuthenticatorTests extends AbstractAuthenticatorTests
         var e = expectThrows(ElasticsearchSecurityException.class, future::actionGet);
         assertThat(e, sameInstance(failureError));
 
-        // verify we recorded failure metric
+        // verify we recorded failure metric with fault attribute (401 -> CLIENT via default fromException)
         assertSingleFailedAuthMetric(
             telemetryPlugin,
             SecurityMetricType.AUTHC_SERVICE_ACCOUNT,
             Map.ofEntries(
-                Map.entry(ServiceAccountAuthenticator.ATTRIBUTE_SERVICE_ACCOUNT_ID, serviceAccountToken.getAccountId().asPrincipal())
+                Map.entry(ServiceAccountAuthenticator.ATTRIBUTE_SERVICE_ACCOUNT_ID, serviceAccountToken.getAccountId().asPrincipal()),
+                Map.entry(
+                    ServiceAccountAuthenticator.ATTRIBUTE_SERVICE_ACCOUNT_AUTHC_FAILURE_REASON,
+                    AuthcFailureReason.CLIENT_AUTHENTICATION_FAILED.value()
+                )
             )
         );
 
